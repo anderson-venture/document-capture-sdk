@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Capture SDK - MVP</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Document Capture SDK</h1>
+            <p>Smart document scanning with automatic detection and enhancement</p>
+        </div>
+
+        <div class="sdk-demo">
+            <div class="capture-container">
+                <div class="video-container">
+                    <video id="cameraVideo" autoplay playsinline></video>
+                    <div class="capture-overlay">
+                        <div class="center-guide">
+                            <div>Position document within this area</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                <button id="captureBtn" class="btn btn-success" disabled>Capture Document</button>
+                <button id="stopBtn" class="btn btn-secondary" disabled>Stop Camera</button>
+            </div>
+
+            <div id="status" class="status hidden"></div>
+
+            <div id="processing" class="processing hidden">
+                <div class="spinner"></div>
+                <p>Processing document...</p>
+            </div>
+
+            <div id="results" class="results hidden">
+                <h3>Captured Results</h3>
+                <div id="resultImages" class="result-images"></div>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>Auto Detection</h4>
+                    <p>Automatically detects document boundaries</p>
+                </div>
+                <div class="feature-item">
+                    <h4>Smart Cropping</h4>
+                    <p>Crops and straightens documents</p>
+                </div>
+                <div class="feature-item">
+                    <h4>Enhancement</h4>
+                    <p>Improves image quality and contrast</p>
+                </div>
+                <div class="feature-item">
+                    <h4>Cross-Platform</h4>
+                    <p>Works on desktop and mobile browsers</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add OpenCV.js when ready -->
+    <script src="https://docs.opencv.org/4.8.0/opencv.js"></script>
+    <script src="document-capture-sdk.js"></script>
+    <script src="demo.js"></script>
+</body>
+</html>
