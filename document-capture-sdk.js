@@ -9,7 +9,7 @@ class DocumentCapture {
             width: options.width || 1280,
             height: options.height || 720,
             enableDocumentDetection: options.enableDocumentDetection !== false,
-            enhanceImage: options.enhanceImage !== false
+            enhanceImage: options.enhanceImage !== true
         };
 
         this.stream = null;
