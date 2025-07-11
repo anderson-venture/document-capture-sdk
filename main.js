@@ -1,25 +1,15 @@
-import { DocumentCapture } from "./sdk/document-capture";
-
 // Application logic
 let documentCapture = null;
 let captureCount = 0;
 
 // DOM elements
-const startBtn = document.getElementById('startBtn');
 const captureBtn = document.getElementById('captureBtn');
-const stopBtn = document.getElementById('stopBtn');
 const statusMessage = document.getElementById('statusMessage');
 const opencvStatus = document.getElementById('opencvStatus');
 const results = document.getElementById('results');
 
 // OpenCV.js loading
 function onOpenCvReady() {
-    console.log('OpenCV.js is ready');
-    opencvStatus.innerHTML = '✅ OpenCV.js loaded successfully - Enhanced document detection available';
-    opencvStatus.style.background = '#dcfce7';
-    opencvStatus.style.color = '#166534';
-    opencvStatus.style.border = '1px solid #86efac';
-    
     initializeCapture();
 }
 
@@ -32,6 +22,12 @@ function initializeCapture() {
         onStatusChange: updateStatus,
         enableDocumentDetection: true,
         enhanceImage: true
+    });
+    // Automatically start the camera
+    documentCapture.startCamera().then(success => {
+        if (success) {
+            captureBtn.disabled = false;
+        }
     });
 }
 
@@ -116,35 +112,16 @@ function handleCapture(result) {
         </div>
     `;
     
-    results.insertBefore(resultDiv, results.firstChild);
+    results.innerHTML = '';
+    results.appendChild(resultDiv);
 }
 
 
 // Button event listeners
-startBtn.addEventListener('click', async () => {
-    startBtn.disabled = true;
-    const success = await documentCapture.startCamera();
-    if (success) {
-        captureBtn.disabled = false;
-        stopBtn.disabled = false;
-        startBtn.textContent = 'Camera Active';
-    } else {
-        startBtn.disabled = false;
-    }
-});
-
 captureBtn.addEventListener('click', async () => {
     captureBtn.disabled = true;
     await documentCapture.captureDocument();
     captureBtn.disabled = false;
-});
-
-stopBtn.addEventListener('click', () => {
-    documentCapture.stopCamera();
-    startBtn.disabled = false;
-    startBtn.textContent = 'Start Camera';
-    captureBtn.disabled = true;
-    stopBtn.disabled = true;
 });
 
 // Initialize when OpenCV is ready
