@@ -48,8 +48,6 @@ class DocumentCapture {
             this.video.srcObject = this.stream;
             this.isCapturing = true;
             
-            this.updateStatus('Camera ready - Position your document', 'success');
-            
             return true;
         } catch (error) {
             this.handleError('Failed to access camera: ' + error.message);
@@ -162,13 +160,13 @@ class DocumentCapture {
             
             // Morphological operations
             const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-            const closed = new cv.Mat();
-            cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel);
+            const closedFinal = new cv.Mat();
+            cv.morphologyEx(edges, closedFinal, cv.MORPH_CLOSE, kernel);
             
             // Find contours
             const contours = new cv.MatVector();
             const hierarchy = new cv.Mat();
-            cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            cv.findContours(closedFinal, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
             console.log("findContours")
             
@@ -203,7 +201,6 @@ class DocumentCapture {
                 grayscale: this.matToCanvas(gray),
                 blurred: this.matToCanvas(blurred),
                 edges: this.matToCanvas(edges),
-                morphed: this.matToCanvas(closed),
                 contours: this.matToCanvas(contourVis),
                 documentBounds: this.matToCanvas(docVis)
             };
@@ -231,8 +228,8 @@ class DocumentCapture {
             adaptive.delete();
             blurred.delete();
             edges.delete();
-            closed.delete();
             kernel.delete();
+            closedFinal.delete();
             contours.delete();
             hierarchy.delete();
             contourVis.delete();
