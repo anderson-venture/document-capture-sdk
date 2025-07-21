@@ -54,7 +54,10 @@
                     <span id="modalMessage"></span>
                 </div>
                 <div class="modal-body">
-                    <div id="confirmImage" class="confirm-image"></div>
+                    <div id="detectionWarning" class="detection-warning" style="display: none;">
+                        <span class="warning-icon">⚠️</span>
+                        <span class="warning-text">Document detection failed. Showing full image.</span>
+                    </div>
                 </div>
                 <div class="modal-actions">
                     <button id="modalRetakeBtn" class="btn btn-secondary">No, redo</button>
@@ -63,8 +66,6 @@
             </div>
         </div>
 
-        <!-- Results Container (hidden by default) -->
-        <div id="results" class="results" style="display: none;"></div>
     </div>
 
     <!-- Add OpenCV.js when ready -->

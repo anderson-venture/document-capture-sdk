@@ -24,6 +24,7 @@ class DocumentCapture {
     init() {
         this.video = document.querySelector(this.options.container);
         this.canvas = document.createElement('canvas');
+        console.log(this.canvas)
         this.ctx = this.canvas.getContext('2d');
         
         if (!this.video) {
@@ -74,7 +75,6 @@ class DocumentCapture {
             let processedImage = originalImage;
             let documentBounds = null;
             let perspectiveTransform = null;
-            let debugResults = null;
             
             if (this.options.enableDocumentDetection) {
                 const detectionResult = await this.detectDocument(imageData);
@@ -82,10 +82,8 @@ class DocumentCapture {
                     console.log("detected")
                     documentBounds = detectionResult.bounds;
                     perspectiveTransform = detectionResult.perspectiveTransform;
-                    debugResults = detectionResult.debugResults;
                     processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
-                } else {
-                    debugResults = detectionResult.debugResults;
+                    console.log(`detectDocument ${processedImage}`)
                 }
             }
             
@@ -94,7 +92,6 @@ class DocumentCapture {
                 processedImage,
                 documentBounds,
                 perspectiveTransform,
-                debugResults,
                 timestamp: new Date().toISOString(),
                 metadata: {
                     width: this.canvas.width,
@@ -170,40 +167,8 @@ class DocumentCapture {
 
             console.log("findContours")
             
-            // Create contour visualization
-            const contourVis = new cv.Mat.zeros(height, width, cv.CV_8UC3);
-            const color = new cv.Scalar(0, 255, 0);
-            cv.drawContours(contourVis, contours, -1, color, 2);
-            
             // Find the largest quadrilateral contour
             const documentContour = this.findLargestQuadrilateral(contours, width, height);
-            
-            // Create document boundary visualization
-            const docVis = srcRGB.clone();
-            if (documentContour) {
-                const docColor = new cv.Scalar(255, 0, 0);
-                // Create MatVector and push the contour
-                let contoursVec = new cv.MatVector();
-                contoursVec.push_back(documentContour);
-
-                // Draw contours
-                cv.drawContours(docVis, contoursVec, -1, docColor, 3);
-
-                // Clean up
-                contoursVec.delete()
-            }
-
-            console.log("documentContour")
-            
-            // Store intermediate results for debugging
-            const debugResults = {
-                original: this.matToCanvas(srcRGB),
-                grayscale: this.matToCanvas(gray),
-                blurred: this.matToCanvas(blurred),
-                edges: this.matToCanvas(edges),
-                contours: this.matToCanvas(contourVis),
-                documentBounds: this.matToCanvas(docVis)
-            };
             
             let bounds = null;
             let perspectiveTransform = null;
@@ -232,8 +197,6 @@ class DocumentCapture {
             closedFinal.delete();
             contours.delete();
             hierarchy.delete();
-            contourVis.delete();
-            docVis.delete();
             if (documentContour) {
                 documentContour.delete();
             }
@@ -241,8 +204,7 @@ class DocumentCapture {
             return {
                 bounds,
                 perspectiveTransform,
-                hasDocument: !!documentContour,
-                debugResults
+                hasDocument: !!documentContour
             };
             
         } catch (error) {
@@ -393,13 +355,6 @@ class DocumentCapture {
         return orderedPoints;
     }
 
-    // Helper method to convert cv.Mat to canvas
-    matToCanvas(mat) {
-        const canvas = document.createElement('canvas');
-        cv.imshow(canvas, mat);
-        return canvas.toDataURL();
-    }
-
     // Simple document detection fallback
     async detectDocumentSimple(imageData) {
         const { data, width, height } = imageData;
@@ -497,8 +452,25 @@ class DocumentCapture {
                     if (correctedCanvas) {
                         canvas = correctedCanvas;
                         ctx = canvas.getContext('2d');
+                    } else {
+                        // If perspective transform fails, fall back to simple cropping
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        
+                        tempCanvas.width = bounds.width;
+                        tempCanvas.height = bounds.height;
+                        
+                        tempCtx.drawImage(
+                            img,
+                            bounds.x, bounds.y, bounds.width, bounds.height,
+                            0, 0, bounds.width, bounds.height
+                        );
+                        
+                        canvas = tempCanvas;
+                        ctx = tempCtx;
                     }
                 } else {
+                    // Simple cropping without perspective correction
                     canvas = document.createElement('canvas');
                     ctx = canvas.getContext('2d');
                     

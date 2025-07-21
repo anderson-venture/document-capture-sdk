@@ -9,7 +9,6 @@ let backResult = null;
 // DOM elements
 const captureBtn = document.getElementById('captureBtn');
 const statusMessage = document.getElementById('statusMessage');
-const results = document.getElementById('results');
 
 // Navigation elements
 const backBtn = document.getElementById('backBtn');
@@ -22,7 +21,12 @@ const confirmModal = document.getElementById('confirmModal');
 const modalMessage = document.getElementById('modalMessage');
 const modalOkBtn = document.getElementById('modalOkBtn');
 const modalRetakeBtn = document.getElementById('modalRetakeBtn');
-const confirmImage = document.getElementById('confirmImage');
+const detectionWarning = document.getElementById('detectionWarning');
+
+const videoContainer = document.querySelector('.video-container');
+const cameraVideo = document.getElementById('cameraVideo');
+const documentFrame = document.querySelector('.document-frame');
+let confirmImage = null;
 
 // OpenCV.js loading
 function onOpenCvReady() {
@@ -68,15 +72,35 @@ function updateStepUI() {
     }
 }
 
-function showModal(message, onOk, onRetake, imageUrl) {
+function showModal(message, onOk, onRetake, imageUrl, detectionSuccessful = true) {
     modalMessage.textContent = message;
     confirmModal.style.display = 'flex';
     
     // Set status for confirmation
     updateStatus('Confirm that the data is clear and the text is legible');
     
-    // Show captured image in modal
+    // Hide camera video and show detected image in video container
+    cameraVideo.style.display = 'none';
+    if (!confirmImage) {
+        confirmImage = document.createElement('div');
+        confirmImage.id = 'confirmImage';
+        confirmImage.style.width = '100%';
+        confirmImage.style.height = '100%';
+        confirmImage.style.backgroundSize = 'cover';
+        confirmImage.style.backgroundPosition = 'center';
+        confirmImage.style.backgroundRepeat = 'no-repeat';
+        confirmImage.style.borderRadius = '10px';
+        documentFrame.appendChild(confirmImage);
+    }
     confirmImage.style.backgroundImage = `url(${imageUrl})`;
+    confirmImage.style.display = 'block';
+    
+    // Show/hide detection warning based on detection success
+    if (detectionSuccessful) {
+        detectionWarning.style.display = 'none';
+    } else {
+        detectionWarning.style.display = 'flex';
+    }
     
     // Remove previous listeners
     modalOkBtn.onclick = null;
@@ -85,10 +109,16 @@ function showModal(message, onOk, onRetake, imageUrl) {
     // Set new listeners
     modalOkBtn.onclick = () => {
         confirmModal.style.display = 'none';
+        // Restore camera video, hide detected image
+        cameraVideo.style.display = '';
+        if (confirmImage) confirmImage.style.display = 'none';
         onOk();
     };
     modalRetakeBtn.onclick = () => {
         confirmModal.style.display = 'none';
+        // Restore camera video, hide detected image
+        cameraVideo.style.display = '';
+        if (confirmImage) confirmImage.style.display = 'none';
         onRetake();
     };
 }
@@ -97,9 +127,12 @@ function handleCapture(result) {
     // Hide capture button during confirmation
     captureBtn.style.display = 'none';
     
-    // Show modal for confirmation, pass processed image
+    // Check if document detection was successful
+    const detectionSuccessful = result.metadata.hasDocumentDetection;
+    
+    // Show modal for confirmation, pass the PROCESSED image (not original)
     showModal(
-        `A foto do documento ficou boa?`,
+        `Is the document photo okay?`,
         () => { /* OK handler */
             if (currentStep === 'front') {
                 frontResult = result;
@@ -124,7 +157,8 @@ function handleCapture(result) {
             captureBtn.style.display = '';
             updateStepUI();
         },
-        result.processedImage // Pass processed image for confirmation
+        result.processedImage, // This is the detected/cropped document image
+        detectionSuccessful // Pass detection status
     );
 }
 
