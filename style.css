@@ -88,8 +88,14 @@ body {
 }
 
 .step-icon {
-    font-size: 20px;
-    line-height: 1;
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    transition: transform 0.2s ease;
+}
+
+.step-tab.active .step-icon {
+    transform: scale(1.2);
 }
 
 .step-label {
@@ -157,10 +163,8 @@ body {
 .capture-btn {
     width: 80px;
     height: 80px;
-    border-radius: 50%;
-    border: 3px solid #10b981;
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
+    border: none;
+    background: none;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -170,8 +174,6 @@ body {
 }
 
 .capture-btn:hover:not(:disabled) {
-    background: #10b981;
-    color: white;
     transform: scale(1.05);
 }
 
@@ -181,7 +183,9 @@ body {
 }
 
 .capture-icon {
-    line-height: 1;
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
 }
 
 /* Modal */
