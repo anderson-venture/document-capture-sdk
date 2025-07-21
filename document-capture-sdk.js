@@ -24,8 +24,7 @@ class DocumentCapture {
     init() {
         this.video = document.querySelector(this.options.container);
         this.canvas = document.createElement('canvas');
-        console.log(this.canvas)
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
         
         if (!this.video) {
             this.handleError('Video element not found');
@@ -79,11 +78,9 @@ class DocumentCapture {
             if (this.options.enableDocumentDetection) {
                 const detectionResult = await this.detectDocument(imageData);
                 if (detectionResult.bounds) {
-                    console.log("detected")
                     documentBounds = detectionResult.bounds;
                     perspectiveTransform = detectionResult.perspectiveTransform;
                     processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
-                    console.log(`detectDocument ${processedImage}`)
                 }
             }
             
@@ -119,11 +116,9 @@ class DocumentCapture {
     // Updated detectDocument method
     async detectDocument(imageData) {
         if (typeof cv !== 'undefined' && cv.Mat) {
-            console.log('Using OpenCV.js for document detection');
             return this.detectDocumentWithOpenCV(imageData);
         }
         
-        console.log('OpenCV.js not available, using fallback detection');
         return this.detectDocumentSimple(imageData);
     }
 
@@ -164,8 +159,6 @@ class DocumentCapture {
             const contours = new cv.MatVector();
             const hierarchy = new cv.Mat();
             cv.findContours(closedFinal, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-            console.log("findContours")
             
             // Find the largest quadrilateral contour
             const documentContour = this.findLargestQuadrilateral(contours, width, height);
@@ -174,7 +167,6 @@ class DocumentCapture {
             let perspectiveTransform = null;
             
             if (documentContour) {
-                console.log("documentCountour")
                 const rect = cv.boundingRect(documentContour);
                 bounds = {
                     x: rect.x,

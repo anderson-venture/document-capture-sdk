@@ -6,15 +6,16 @@ let currentStep = 'front'; // or 'back'
 let frontResult = null;
 let backResult = null;
 
-// DOM elements
+// Cache DOM elements for better performance
 const captureBtn = document.getElementById('captureBtn');
 const statusMessage = document.getElementById('statusMessage');
-
-// Navigation elements
 const backBtn = document.getElementById('backBtn');
 const closeBtn = document.getElementById('closeBtn');
 const frontTab = document.getElementById('frontTab');
 const backTab = document.getElementById('backTab');
+const videoContainer = document.querySelector('.video-container');
+const cameraVideo = document.getElementById('cameraVideo');
+const documentFrame = document.querySelector('.document-frame');
 
 // Modal elements
 const confirmModal = document.getElementById('confirmModal');
@@ -23,10 +24,16 @@ const modalOkBtn = document.getElementById('modalOkBtn');
 const modalRetakeBtn = document.getElementById('modalRetakeBtn');
 const detectionWarning = document.getElementById('detectionWarning');
 
-const videoContainer = document.querySelector('.video-container');
-const cameraVideo = document.getElementById('cameraVideo');
-const documentFrame = document.querySelector('.document-frame');
+// Confirm image element (created dynamically)
 let confirmImage = null;
+
+// Cleanup function for confirmImage
+function cleanupConfirmImage() {
+    if (confirmImage && confirmImage.parentNode) {
+        confirmImage.parentNode.removeChild(confirmImage);
+        confirmImage = null;
+    }
+}
 
 // OpenCV.js loading
 function onOpenCvReady() {
@@ -142,8 +149,6 @@ function handleCapture(result) {
             } else {
                 backResult = result;
                 updateStatus('Both sides were captured! Check the console for results.');
-                console.log('Front ID Card Result:', frontResult);
-                console.log('Back ID Card Result:', backResult);
                 setTimeout(() => {
                     currentStep = 'front';
                     frontResult = null;
@@ -177,6 +182,7 @@ closeBtn.addEventListener('click', () => {
         currentStep = 'front';
         frontResult = null;
         backResult = null;
+        cleanupConfirmImage();
         updateStepUI();
     }
 });
