@@ -69,11 +69,11 @@ function handleError(error) {
 
 function updateStepUI() {
     if (currentStep === 'front') {
-        updateStatus('Place the front of your document inside the marking on a flat surface and photograph.');
+        updateStatus('Posicione a frente do seu documento dentro da marcação em uma superfície plana e fotografe.');
         frontTab.classList.add('active');
         backTab.classList.remove('active');
     } else {
-        updateStatus('Place the back of your document inside the marking on a flat surface and photograph.');
+        updateStatus('Posicione o verso do seu documento dentro da marcação em uma superfície plana e fotografe.');
         frontTab.classList.remove('active');
         backTab.classList.add('active');
     }
@@ -84,7 +84,7 @@ function showModal(message, onOk, onRetake, imageUrl, detectionSuccessful = true
     confirmModal.style.display = 'flex';
     
     // Set status for confirmation
-    updateStatus('Confirm that the data is clear and the text is legible');
+    updateStatus('Confirme se os dados ficaram nítidos e os textos legíveis');
     
     // Hide camera video and show detected image in video container
     cameraVideo.style.display = 'none';
@@ -139,7 +139,7 @@ function handleCapture(result) {
     
     // Show modal for confirmation, pass the PROCESSED image (not original)
     showModal(
-        `Is the document photo okay?`,
+        `A foto do documento ficou boa?`,
         () => { /* OK handler */
             if (currentStep === 'front') {
                 frontResult = result;
@@ -148,7 +148,7 @@ function handleCapture(result) {
                 captureBtn.style.display = '';
             } else {
                 backResult = result;
-                updateStatus('Both sides were captured! Check the console for results.');
+                updateStatus('Ambos os lados foram capturados! Verifique o console para os resultados.');
                 setTimeout(() => {
                     currentStep = 'front';
                     frontResult = null;
@@ -177,7 +177,7 @@ backBtn.addEventListener('click', () => {
 
 closeBtn.addEventListener('click', () => {
     // Handle close action - could reset or navigate away
-    if (confirm('Do you want to exit the capture process?')) {
+    if (confirm('Deseja sair do processo de captura?')) {
         // Reset or close
         currentStep = 'front';
         frontResult = null;
@@ -223,7 +223,7 @@ if (typeof cv !== 'undefined') {
     setTimeout(() => {
         if (typeof cv === 'undefined') {
             clearInterval(checkInterval);
-            updateStatus('⚠️ OpenCV.js failed to load - Using alternative detection');
+            updateStatus('⚠️ OpenCV.js falhou ao carregar - Usando detecção alternativa');
             initializeCapture();
         }
     }, 10000);
