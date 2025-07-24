@@ -40,7 +40,10 @@ class DocumentCapture {
                 video: {
                     width: { ideal: this.options.width },
                     height: { ideal: this.options.height },
-                    facingMode: 'environment'
+                    facingMode: 'environment',
+                    focusMode: 'continuous',
+                    exposureMode: 'continuous',
+                    whiteBalanceMode: 'continuous'
                 }
             };
 
@@ -139,19 +142,19 @@ class DocumentCapture {
             const gray = new cv.Mat();
             cv.cvtColor(srcRGB, gray, cv.COLOR_RGB2GRAY);
             // --- Preprocessing Enhancements ---
-            // 1. Adaptive Thresholding
+            // 1. Adaptive Thresholding (less aggressive for mobile)
             const adaptive = new cv.Mat();
-            cv.adaptiveThreshold(gray, adaptive, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
-            // 2. Smaller Gaussian Blur (5x5)
+            cv.adaptiveThreshold(gray, adaptive, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 15, 2);
+            // 2. Smaller Gaussian Blur (3x3 for mobile)
             const blurred = new cv.Mat();
-            const ksize = new cv.Size(11, 11);
+            const ksize = new cv.Size(3, 3);
             cv.GaussianBlur(adaptive, blurred, ksize, 0);
-            // Edge detection using Canny
+            // Edge detection using Canny (adjusted for mobile)
             const edges = new cv.Mat();
-            cv.Canny(blurred, edges, 50, 150);
+            cv.Canny(blurred, edges, 30, 100);
             
-            // Morphological operations
-            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            // Morphological operations (gentler for mobile)
+            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
             const closedFinal = new cv.Mat();
             cv.morphologyEx(edges, closedFinal, cv.MORPH_CLOSE, kernel);
             

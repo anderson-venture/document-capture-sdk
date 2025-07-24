@@ -128,8 +128,8 @@ body {
 .document-frame {
     position: relative;
     width: 100%;
-    max-width: 320px;
-    height: 200px;
+    max-width: 400px;
+    height: 280px;
     border: 2px dashed #10b981;
     border-radius: 12px;
     overflow: hidden;
@@ -322,8 +322,8 @@ body {
     }
     
     .document-frame {
-        max-width: 280px;
-        height: 180px;
+        max-width: 350px;
+        height: 240px;
     }
     
     .capture-btn {
