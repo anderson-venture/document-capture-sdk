@@ -24,7 +24,7 @@ class DocumentCapture {
     init() {
         this.video = document.querySelector(this.options.container);
         this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
         
         if (!this.video) {
             this.handleError('Video element not found');
@@ -144,18 +144,13 @@ class DocumentCapture {
             let processedImage = originalImage;
             let documentBounds = null;
             let perspectiveTransform = null;
-            let debugResults = null;
             
             if (this.options.enableDocumentDetection) {
                 const detectionResult = await this.detectDocument(imageData);
                 if (detectionResult.bounds) {
-                    console.log("detected")
                     documentBounds = detectionResult.bounds;
                     perspectiveTransform = detectionResult.perspectiveTransform;
-                    debugResults = detectionResult.debugResults;
                     processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
-                } else {
-                    debugResults = detectionResult.debugResults;
                 }
             }
             
@@ -164,7 +159,6 @@ class DocumentCapture {
                 processedImage,
                 documentBounds,
                 perspectiveTransform,
-                debugResults,
                 timestamp: new Date().toISOString(),
                 metadata: {
                     width: this.canvas.width,
@@ -192,11 +186,9 @@ class DocumentCapture {
     // Updated detectDocument method
     async detectDocument(imageData) {
         if (typeof cv !== 'undefined' && cv.Mat) {
-            console.log('Using OpenCV.js for document detection');
             return this.detectDocumentWithOpenCV(imageData);
         }
         
-        console.log('OpenCV.js not available, using fallback detection');
         return this.detectDocumentSimple(imageData);
     }
 
@@ -212,7 +204,7 @@ class DocumentCapture {
             // Convert RGBA to RGB
             const srcRGB = new cv.Mat();
             cv.cvtColor(src, srcRGB, cv.COLOR_RGBA2RGB);
-            
+
             // === MULTI-METHOD DETECTION APPROACH ===
             
             // Method 1: Enhanced Edge Detection with Noise Suppression
@@ -258,7 +250,6 @@ class DocumentCapture {
             src.delete();
             srcRGB.delete();
             this.cleanupDetectionResults([edgeResult, colorResult, gradientResult, finalResult]);
-            
             return {
                 bounds,
                 perspectiveTransform,
@@ -272,7 +263,7 @@ class DocumentCapture {
             return this.detectDocumentSimple(imageData);
         }
     }
-
+  
     // Method 1: Enhanced Edge Detection with Advanced Noise Suppression
     detectByEnhancedEdges(srcRGB) {
         const gray = new cv.Mat();
@@ -888,13 +879,6 @@ class DocumentCapture {
         }
         
         return orderedPoints;
-    }
-
-    // Helper method to convert cv.Mat to canvas
-    matToCanvas(mat) {
-        const canvas = document.createElement('canvas');
-        cv.imshow(canvas, mat);
-        return canvas.toDataURL();
     }
 
     // Simple document detection fallback

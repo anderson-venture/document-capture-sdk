@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,38 +7,66 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📄 Document Capture</h1>
-            <p>Advanced document detection with perspective correction</p>
-        </div>
-        
-        <div class="main-content">
-            <div id="statusMessage" class="status info" style="display: none;">
-                Ready to capture documents
+    <div class="app-container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <button id="backBtn" class="nav-btn">
+                <span class="nav-icon">‹</span>
+            </button>
+            <div class="step-indicators">
+                <button id="frontTab" class="step-tab active">
+                    <img src="assets/front_status.png" alt="Frente" class="step-icon">
+                    <span class="step-label">Frente</span>
+                </button>
+                <button id="backTab" class="step-tab">
+                    <img src="assets/back_status.png" alt="Verso" class="step-icon">
+                    <span class="step-label">Verso</span>
+                </button>
             </div>
-            
-            <div class="video-container">
+            <button id="closeBtn" class="nav-btn">
+                <span class="nav-icon">✕</span>
+            </button>
+        </div>
+
+        <!-- Status Message -->
+        <div id="statusMessage" class="status-message">
+            Posicione a frente do seu documento dentro da marcação em uma superfície plana e fotografe.
+        </div>
+
+        <!-- Video Container with Document Frame -->
+        <div class="video-container">
+            <div class="document-frame">
                 <video id="cameraVideo" autoplay playsinline muted></video>
                 <div class="camera-hint">💡 Tap on the video to focus on your document</div>
             </div>
-            
-            <div class="controls">
-                <button id="captureBtn" class="btn btn-success" disabled>Capture Document</button>
-            </div>
-            
-            <div id="results" class="results"></div>
-            <!-- Modal for confirmation -->
-            <div id="confirmModal" class="modal" style="display:none;">
-                <div class="modal-content">
+        </div>
+
+        <!-- Capture Button -->
+        <div class="capture-section">
+            <button id="captureBtn" class="capture-btn" disabled>
+                <img src="assets/Capture button.png" alt="Capturar" class="capture-icon">
+            </button>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div id="confirmModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
                     <span id="modalMessage"></span>
-                    <div class="modal-actions">
-                        <button id="modalOkBtn" class="btn btn-success">OK</button>
-                        <button id="modalRetakeBtn" class="btn btn-secondary">Retake</button>
+                </div>
+                <div class="modal-body">
+                    <div id="detectionWarning" class="detection-warning" style="display: none;">
+                        <span class="warning-icon">⚠️</span>
+                        <span class="warning-text">Falha na detecção do documento. Mostrando imagem completa.</span>
                     </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="modalRetakeBtn" class="btn btn-secondary">Não, refazer</button>
+                    <button id="modalOkBtn" class="btn btn-success">Sim</button>
                 </div>
             </div>
         </div>
+
     </div>
 
     <!-- Add OpenCV.js when ready -->

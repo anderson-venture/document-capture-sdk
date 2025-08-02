@@ -1,23 +1,39 @@
 // Application logic
 let documentCapture = null;
-let captureCount = 0;
 
 // State for multi-step capture
 let currentStep = 'front'; // or 'back'
 let frontResult = null;
 let backResult = null;
 
-// DOM elements
+// Cache DOM elements for better performance
 const captureBtn = document.getElementById('captureBtn');
 const statusMessage = document.getElementById('statusMessage');
-const opencvStatus = document.getElementById('opencvStatus');
-const results = document.getElementById('results');
+const backBtn = document.getElementById('backBtn');
+const closeBtn = document.getElementById('closeBtn');
+const frontTab = document.getElementById('frontTab');
+const backTab = document.getElementById('backTab');
+const videoContainer = document.querySelector('.video-container');
+const cameraVideo = document.getElementById('cameraVideo');
+const documentFrame = document.querySelector('.document-frame');
 
 // Modal elements
 const confirmModal = document.getElementById('confirmModal');
 const modalMessage = document.getElementById('modalMessage');
 const modalOkBtn = document.getElementById('modalOkBtn');
 const modalRetakeBtn = document.getElementById('modalRetakeBtn');
+const detectionWarning = document.getElementById('detectionWarning');
+
+// Confirm image element (created dynamically)
+let confirmImage = null;
+
+// Cleanup function for confirmImage
+function cleanupConfirmImage() {
+    if (confirmImage && confirmImage.parentNode) {
+        confirmImage.parentNode.removeChild(confirmImage);
+        confirmImage = null;
+    }
+}
 
 // OpenCV.js loading
 function onOpenCvReady() {
@@ -45,141 +61,148 @@ function initializeCapture() {
 // Event handlers
 function updateStatus(message, type) {
     statusMessage.textContent = message;
-    statusMessage.className = `status ${type}`;
-    statusMessage.style.display = 'block';
 }
 
 function handleError(error) {
-    updateStatus(`Error: ${error.message}`, 'error');
+    updateStatus(`Erro: ${error.message}`);
 }
 
-const videoContainer = document.querySelector('.video-container');
-const cameraVideo = document.getElementById('cameraVideo');
-let confirmImage = null;
+function updateStepUI() {
+    if (currentStep === 'front') {
+        updateStatus('Posicione a frente do seu documento dentro da marcação em uma superfície plana e fotografe.');
+        frontTab.classList.add('active');
+        backTab.classList.remove('active');
+    } else {
+        updateStatus('Posicione o verso do seu documento dentro da marcação em uma superfície plana e fotografe.');
+        frontTab.classList.remove('active');
+        backTab.classList.add('active');
+    }
+}
 
-function showModal(message, onOk, onRetake, imageUrl) {
+function showModal(message, onOk, onRetake, imageUrl, detectionSuccessful = true) {
     modalMessage.textContent = message;
     confirmModal.style.display = 'flex';
+    
     // Set status for confirmation
-    updateStatus('Confirm that the data is clear and the text is legible', 'info');
-    // Hide video, show captured image
+    updateStatus('Confirme se os dados ficaram nítidos e os textos legíveis');
+    
+    // Hide camera video and show detected image in video container
     cameraVideo.style.display = 'none';
     if (!confirmImage) {
-        confirmImage = document.createElement('img');
+        confirmImage = document.createElement('div');
         confirmImage.id = 'confirmImage';
         confirmImage.style.width = '100%';
+        confirmImage.style.height = '100%';
+        confirmImage.style.backgroundSize = 'cover';
+        confirmImage.style.backgroundPosition = 'center';
+        confirmImage.style.backgroundRepeat = 'no-repeat';
         confirmImage.style.borderRadius = '10px';
-        confirmImage.style.boxShadow = '0 10px 25px rgba(0,0,0,0.1)';
-        videoContainer.appendChild(confirmImage);
+        documentFrame.appendChild(confirmImage);
     }
-    confirmImage.src = imageUrl;
-    confirmImage.style.display = '';
+    confirmImage.style.backgroundImage = `url(${imageUrl})`;
+    confirmImage.style.display = 'block';
+    
+    // Show/hide detection warning based on detection success
+    if (detectionSuccessful) {
+        detectionWarning.style.display = 'none';
+    } else {
+        detectionWarning.style.display = 'flex';
+    }
+    
     // Remove previous listeners
     modalOkBtn.onclick = null;
     modalRetakeBtn.onclick = null;
+    
     // Set new listeners
     modalOkBtn.onclick = () => {
         confirmModal.style.display = 'none';
-        // Restore video, hide image
+        // Restore camera video, hide detected image
         cameraVideo.style.display = '';
         if (confirmImage) confirmImage.style.display = 'none';
         onOk();
     };
     modalRetakeBtn.onclick = () => {
         confirmModal.style.display = 'none';
-        // Restore video, hide image
+        // Restore camera video, hide detected image
         cameraVideo.style.display = '';
         if (confirmImage) confirmImage.style.display = 'none';
         onRetake();
     };
 }
 
-function updateStepUI() {
-    if (currentStep === 'front') {
-        updateStatus('Place the front of your document inside the marking on a flat surface and photograph.', 'info');
-    } else {
-        updateStatus('Place the back of your document inside the marking on a flat surface and photograph.', 'info');
-    }
-}
-
 function handleCapture(result) {
-    // Show result as before
-    const resultDiv = document.createElement('div');
-    resultDiv.className = 'result-item';
-    const timestamp = new Date(result.timestamp).toLocaleString();
-    let debugSection = '';
-    if (result.debugResults) {
-        debugSection = `
-            <div class="debug-results">
-                <div class="debug-item"><h4>🖼️ Original</h4><img src="${result.debugResults.original}" alt="Original"></div>
-                <div class="debug-item"><h4>🔆 Enhanced Contrast</h4><img src="${result.debugResults.enhanced_contrast}" alt="Enhanced Contrast"></div>
-                <div class="debug-item"><h4>🧹 Noise Reduced</h4><img src="${result.debugResults.noise_reduced}" alt="Noise Reduced"></div>
-                <div class="debug-item"><h4>⚡ Enhanced Edges</h4><img src="${result.debugResults.enhanced_edges}" alt="Enhanced Edges"></div>
-                <div class="debug-item"><h4>🎨 Color Segmentation</h4><img src="${result.debugResults.color_segmentation}" alt="Color Segmentation"></div>
-                <div class="debug-item"><h4>📊 Gradient Analysis</h4><img src="${result.debugResults.gradient_magnitude}" alt="Gradient Analysis"></div>
-                <div class="debug-item"><h4>📐 All Contours</h4><img src="${result.debugResults.final_contours}" alt="All Contours"></div>
-                <div class="debug-item"><h4>🎯 Document Bounds</h4><img src="${result.debugResults.document_bounds}" alt="Document Bounds"></div>
-            </div>
-        `;
-    }
-    resultDiv.innerHTML = `
-        <h3>${currentStep === 'front' ? 'Front' : 'Back'} of ID Card</h3>
-        <h4 style="margin: 20px 0 10px; color: #1e293b;">🔍 Debug Steps:</h4>
-        ${debugSection}
-        <h4 style="margin: 20px 0 10px; color: #1e293b;">📊 Final Results:</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-            <div><h4 style="margin: 0 0 10px; font-size: 1rem;">Original Capture</h4><img src="${result.originalImage}" alt="Original capture"></div>
-            <div><h4 style="margin: 0 0 10px; font-size: 1rem;">Processed Document</h4><img src="${result.processedImage}" alt="Processed capture"></div>
-        </div>
-        <div class="metadata">
-            <strong>Timestamp:</strong> ${timestamp}<br>
-            <strong>Resolution:</strong> ${result.metadata.width}x${result.metadata.height}<br>
-            <strong>Detection Method:</strong> ${result.metadata.detectionMethod}<br>
-            <strong>Document Detected:</strong> ${result.metadata.hasDocumentDetection ? '✅ Yes' : '❌ No'}<br>
-            <strong>Perspective Corrected:</strong> ${result.metadata.hasPerspectiveCorrection ? '✅ Yes' : '❌ No'}<br>
-            ${result.confidence ? `<strong>Detection Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%<br>` : ''}
-        </div>
-    `;
-    results.innerHTML = '';
-    results.appendChild(resultDiv);
     // Hide capture button during confirmation
     captureBtn.style.display = 'none';
-    // Show modal for confirmation, pass processed image
+    
+    // Check if document detection was successful
+    const detectionSuccessful = result.metadata.hasDocumentDetection;
+    
+    // Show modal for confirmation, pass the PROCESSED image (not original)
     showModal(
-        `Is this the ${currentStep === 'front' ? 'FRONT' : 'BACK'} of your ID card?`,
+        `A foto do documento ficou boa?`,
         () => { /* OK handler */
             if (currentStep === 'front') {
                 frontResult = result;
                 currentStep = 'back';
                 updateStepUI();
-                results.innerHTML = '';
                 captureBtn.style.display = '';
             } else {
                 backResult = result;
-                updateStatus('Both sides captured! Check the console for results.', 'success');
-                console.log('Front ID Card Result:', frontResult);
-                console.log('Back ID Card Result:', backResult);
+                updateStatus('Ambos os lados foram capturados! Verifique o console para os resultados.');
                 setTimeout(() => {
                     currentStep = 'front';
                     frontResult = null;
                     backResult = null;
-                    results.innerHTML = '';
                     updateStepUI();
                     captureBtn.style.display = '';
                 }, 3000);
             }
         },
         () => { /* Retake handler */
-            results.innerHTML = '';
             captureBtn.style.display = '';
             updateStepUI();
         },
-        result.processedImage // Pass processed image for confirmation
+        result.processedImage, // This is the detected/cropped document image
+        detectionSuccessful // Pass detection status
     );
 }
 
+// Navigation event listeners
+backBtn.addEventListener('click', () => {
+    if (currentStep === 'back') {
+        currentStep = 'front';
+        updateStepUI();
+    }
+});
 
-// Button event listeners
+closeBtn.addEventListener('click', () => {
+    // Handle close action - could reset or navigate away
+    if (confirm('Deseja sair do processo de captura?')) {
+        // Reset or close
+        currentStep = 'front';
+        frontResult = null;
+        backResult = null;
+        cleanupConfirmImage();
+        updateStepUI();
+    }
+});
+
+// Step tab event listeners (optional - for manual navigation)
+frontTab.addEventListener('click', () => {
+    if (currentStep !== 'front') {
+        currentStep = 'front';
+        updateStepUI();
+    }
+});
+
+backTab.addEventListener('click', () => {
+    if (currentStep !== 'back' && frontResult) {
+        currentStep = 'back';
+        updateStepUI();
+    }
+});
+
+// Capture button event listener
 captureBtn.addEventListener('click', async () => {
     captureBtn.disabled = true;
     await documentCapture.captureDocument();
@@ -196,16 +219,15 @@ if (typeof cv !== 'undefined') {
             onOpenCvReady();
         }
     }, 100);
+    
     setTimeout(() => {
         if (typeof cv === 'undefined') {
             clearInterval(checkInterval);
-            opencvStatus.innerHTML = '⚠️ OpenCV.js failed to load - Using fallback detection';
-            opencvStatus.style.background = '#fef3c7';
-            opencvStatus.style.color = '#92400e';
-            opencvStatus.style.border = '1px solid #fcd34d';
+            updateStatus('⚠️ OpenCV.js falhou ao carregar - Usando detecção alternativa');
             initializeCapture();
         }
     }, 10000);
 }
+
 // On load, show step UI
 updateStepUI();
