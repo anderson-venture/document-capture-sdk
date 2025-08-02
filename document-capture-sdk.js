@@ -149,17 +149,17 @@ class DocumentCapture {
             // --- Preprocessing Enhancements ---
             // 1. Adaptive Thresholding
             const adaptive = new cv.Mat();
-            cv.adaptiveThreshold(gray, adaptive, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
+            cv.adaptiveThreshold(gray, adaptive, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 15, 2);
             // 2. Smaller Gaussian Blur (5x5)
             const blurred = new cv.Mat();
-            const ksize = new cv.Size(11, 11);
+            const ksize = new cv.Size(3, 3);
             cv.GaussianBlur(adaptive, blurred, ksize, 0);
             // Edge detection using Canny
             const edges = new cv.Mat();
-            cv.Canny(blurred, edges, 50, 150);
+            cv.Canny(blurred, edges, 30, 100);
             
             // Morphological operations
-            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
             const closedFinal = new cv.Mat();
             cv.morphologyEx(edges, closedFinal, cv.MORPH_CLOSE, kernel);
             
