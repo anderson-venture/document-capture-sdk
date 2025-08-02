@@ -149,7 +149,6 @@ class DocumentCapture {
             if (this.options.enableDocumentDetection) {
                 const detectionResult = await this.detectDocument(imageData);
                 if (detectionResult.bounds) {
-                    console.log("detected")
                     documentBounds = detectionResult.bounds;
                     perspectiveTransform = detectionResult.perspectiveTransform;
                     debugResults = detectionResult.debugResults;
@@ -192,11 +191,9 @@ class DocumentCapture {
     // Updated detectDocument method
     async detectDocument(imageData) {
         if (typeof cv !== 'undefined' && cv.Mat) {
-            console.log('Using OpenCV.js for document detection');
             return this.detectDocumentWithOpenCV(imageData);
         }
         
-        console.log('OpenCV.js not available, using fallback detection');
         return this.detectDocumentSimple(imageData);
     }
 
@@ -213,15 +210,9 @@ class DocumentCapture {
             const srcRGB = new cv.Mat();
             cv.cvtColor(src, srcRGB, cv.COLOR_RGBA2RGB);
             
-            // === MULTI-METHOD DETECTION APPROACH ===
-            
-            // Method 1: Enhanced Edge Detection with Noise Suppression
+            // Multi-method detection approach
             const edgeResult = this.detectByEnhancedEdges(srcRGB);
-            
-            // Method 2: Color-based Document Segmentation  
             const colorResult = this.detectByColorSegmentation(srcRGB);
-            
-            // Method 3: Gradient-based Detection
             const gradientResult = this.detectByGradients(srcRGB);
             
             // Combine results using confidence scoring
@@ -273,54 +264,51 @@ class DocumentCapture {
         }
     }
 
-    // Method 1: Enhanced Edge Detection with Advanced Noise Suppression
+    // Enhanced edge detection with noise suppression
     detectByEnhancedEdges(srcRGB) {
         const gray = new cv.Mat();
         cv.cvtColor(srcRGB, gray, cv.COLOR_RGB2GRAY);
         
-        // Step 1: Adaptive Contrast Enhancement (CLAHE or fallback)
+        // Adaptive contrast enhancement
         const enhanced = new cv.Mat();
         try {
             const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
             clahe.apply(gray, enhanced);
             clahe.delete();
         } catch (error) {
-            console.log('CLAHE not available, using histogram equalization');
             cv.equalizeHist(gray, enhanced);
         }
         
-        // Step 2: Advanced Noise Reduction - Bilateral Filter
+        // Noise reduction
         const denoised = new cv.Mat();
         try {
             cv.bilateralFilter(enhanced, denoised, 9, 75, 75);
         } catch (error) {
-            console.log('Bilateral filter not available, using Gaussian blur');
             cv.GaussianBlur(enhanced, denoised, new cv.Size(5, 5), 0);
         }
         
-        // Step 3: Multi-scale Edge Detection
+        // Multi-scale edge detection
         const edges1 = new cv.Mat();
         const edges2 = new cv.Mat();
         const edges3 = new cv.Mat();
         
-        // Different scales to catch various edge types
-        cv.Canny(denoised, edges1, 50, 150);  // Fine edges
-        cv.Canny(denoised, edges2, 30, 100);  // Medium edges  
-        cv.Canny(denoised, edges3, 80, 200);  // Strong edges only
+        cv.Canny(denoised, edges1, 50, 150);
+        cv.Canny(denoised, edges2, 30, 100);
+        cv.Canny(denoised, edges3, 80, 200);
         
         // Combine edge maps
         const combinedEdges = new cv.Mat();
         cv.bitwise_or(edges1, edges2, combinedEdges);
         cv.bitwise_or(combinedEdges, edges3, combinedEdges);
         
-        // Step 4: Morphological noise suppression
+        // Morphological operations
         const kernel1 = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
         const opened = new cv.Mat();
-        cv.morphologyEx(combinedEdges, opened, cv.MORPH_OPEN, kernel1); // Remove small noise
+        cv.morphologyEx(combinedEdges, opened, cv.MORPH_OPEN, kernel1);
         
         const kernel2 = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
         const closed = new cv.Mat();
-        cv.morphologyEx(opened, closed, cv.MORPH_CLOSE, kernel2); // Connect broken lines
+        cv.morphologyEx(opened, closed, cv.MORPH_CLOSE, kernel2);
         
         // Find contours
         const contours = new cv.MatVector();
@@ -355,7 +343,7 @@ class DocumentCapture {
         };
     }
 
-    // Method 2: Color-based Document Segmentation
+    // Color-based segmentation
     detectByColorSegmentation(srcRGB) {
         // Convert to different color spaces for better separation
         const hsv = new cv.Mat();
@@ -423,7 +411,7 @@ class DocumentCapture {
         };
     }
 
-    // Method 3: Gradient-based Detection
+    // Gradient-based detection
     detectByGradients(srcRGB) {
         const gray = new cv.Mat();
         cv.cvtColor(srcRGB, gray, cv.COLOR_RGB2GRAY);
@@ -586,45 +574,7 @@ class DocumentCapture {
         }
     }
 
-    // Helper method to find the largest quadrilateral contour
-    findLargestQuadrilateral(contours, imageWidth, imageHeight) {
-        const minArea = (imageWidth * imageHeight) * 0.1;
-        let largestArea = 0;
-        let largestQuad = null;
-        const borderMargin = 10;
-        for (let i = 0; i < contours.size(); i++) {
-            const contour = contours.get(i);
-            const rect = cv.boundingRect(contour);
-            // Skip contours too close to the image border
-            if (
-                rect.x < borderMargin ||
-                rect.y < borderMargin ||
-                rect.x + rect.width > imageWidth - borderMargin ||
-                rect.y + rect.height > imageHeight - borderMargin
-            ) {
-                contour.delete();
-                continue;
-            }
-            const area = cv.contourArea(contour);
-            if (area < minArea) {
-                contour.delete();
-                continue;
-            }
-            const epsilon = 0.02 * cv.arcLength(contour, true);
-            const approx = new cv.Mat();
-            cv.approxPolyDP(contour, approx, epsilon, true);
-            if (approx.rows === 4 && area > largestArea) {
-                largestArea = area;
-                if (largestQuad) {
-                    largestQuad.delete();
-                }
-                largestQuad = approx.clone();
-            }
-            approx.delete();
-            contour.delete();
-        }
-        return largestQuad;
-    }
+
 
     // Enhanced perspective transformation calculation for irregular contours
     calculatePerspectiveTransform(contour, imageWidth, imageHeight) {
@@ -634,7 +584,6 @@ class DocumentCapture {
             
             // If we don't have exactly 4 points, create them from bounding rectangle
             if (!points || points.length !== 4) {
-                console.log('Using bounding rectangle for perspective transform');
                 const rect = cv.boundingRect(contour);
                 points = [
                     { x: rect.x, y: rect.y },
@@ -646,7 +595,6 @@ class DocumentCapture {
             
             // Validate points are reasonable
             if (!this.validateQuadrilateral(points, imageWidth, imageHeight)) {
-                console.log('Quadrilateral validation failed');
                 return null;
             }
             
@@ -985,8 +933,6 @@ class DocumentCapture {
                 
                 // Method 1: Try perspective transformation if available and valid
                 if (perspectiveTransform && typeof cv !== 'undefined' && perspectiveTransform.sourcePoints && perspectiveTransform.sourcePoints.length === 4) {
-                    console.log('Attempting perspective transformation...');
-                    
                     canvas = document.createElement('canvas');
                     ctx = canvas.getContext('2d');
                     canvas.width = img.width;
@@ -998,15 +944,11 @@ class DocumentCapture {
                         canvas = correctedCanvas;
                         ctx = canvas.getContext('2d');
                         success = true;
-                        console.log('Perspective transformation successful');
-                    } else {
-                        console.log('Perspective transformation failed, falling back to smart cropping');
                     }
                 }
                 
                 // Method 2: Smart bounding box cropping with padding
                 if (!success && bounds) {
-                    console.log('Using smart bounding box cropping...');
                     canvas = this.performSmartCrop(img, bounds);
                     ctx = canvas.getContext('2d');
                     success = true;
@@ -1014,7 +956,6 @@ class DocumentCapture {
                 
                 // Method 3: Fallback - return original with enhancement
                 if (!success) {
-                    console.log('Using fallback - original image with enhancement');
                     canvas = document.createElement('canvas');
                     ctx = canvas.getContext('2d');
                     canvas.width = img.width;
@@ -1064,7 +1005,6 @@ class DocumentCapture {
             0, 0, cropWidth, cropHeight           // Destination rectangle
         );
         
-        console.log(`Smart crop: ${cropX},${cropY} ${cropWidth}x${cropHeight}`);
         return canvas;
     }
 
