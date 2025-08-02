@@ -112,11 +112,13 @@ function handleCapture(result) {
         debugSection = `
             <div class="debug-results">
                 <div class="debug-item"><h4>🖼️ Original</h4><img src="${result.debugResults.original}" alt="Original"></div>
-                <div class="debug-item"><h4>⚫ Grayscale</h4><img src="${result.debugResults.grayscale}" alt="Grayscale"></div>
-                <div class="debug-item"><h4>🌀 Blurred</h4><img src="${result.debugResults.blurred}" alt="Blurred"></div>
-                <div class="debug-item"><h4>⚡ Canny Edges</h4><img src="${result.debugResults.edges}" alt="Canny Edges"></div>
-                <div class="debug-item"><h4>📐 Contours</h4><img src="${result.debugResults.contours}" alt="Contours"></div>
-                <div class="debug-item"><h4>🎯 Document Bounds</h4><img src="${result.debugResults.documentBounds}" alt="Document Bounds"></div>
+                <div class="debug-item"><h4>🔆 Enhanced Contrast</h4><img src="${result.debugResults.enhanced_contrast}" alt="Enhanced Contrast"></div>
+                <div class="debug-item"><h4>🧹 Noise Reduced</h4><img src="${result.debugResults.noise_reduced}" alt="Noise Reduced"></div>
+                <div class="debug-item"><h4>⚡ Enhanced Edges</h4><img src="${result.debugResults.enhanced_edges}" alt="Enhanced Edges"></div>
+                <div class="debug-item"><h4>🎨 Color Segmentation</h4><img src="${result.debugResults.color_segmentation}" alt="Color Segmentation"></div>
+                <div class="debug-item"><h4>📊 Gradient Analysis</h4><img src="${result.debugResults.gradient_magnitude}" alt="Gradient Analysis"></div>
+                <div class="debug-item"><h4>📐 All Contours</h4><img src="${result.debugResults.final_contours}" alt="All Contours"></div>
+                <div class="debug-item"><h4>🎯 Document Bounds</h4><img src="${result.debugResults.document_bounds}" alt="Document Bounds"></div>
             </div>
         `;
     }
@@ -134,7 +136,8 @@ function handleCapture(result) {
             <strong>Resolution:</strong> ${result.metadata.width}x${result.metadata.height}<br>
             <strong>Detection Method:</strong> ${result.metadata.detectionMethod}<br>
             <strong>Document Detected:</strong> ${result.metadata.hasDocumentDetection ? '✅ Yes' : '❌ No'}<br>
-            <strong>Perspective Corrected:</strong> ${result.metadata.hasPerspectiveCorrection ? '✅ Yes' : '❌ No'}
+            <strong>Perspective Corrected:</strong> ${result.metadata.hasPerspectiveCorrection ? '✅ Yes' : '❌ No'}<br>
+            ${result.confidence ? `<strong>Detection Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%<br>` : ''}
         </div>
     `;
     results.innerHTML = '';
