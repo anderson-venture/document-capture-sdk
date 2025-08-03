@@ -10,67 +10,80 @@
     <div class="app-container">
         <!-- Top Navigation -->
         <div class="top-nav">
-            <button id="backBtn" class="nav-btn">
-                <span class="nav-icon">‹</span>
+            <button id="backBtn" class="nav-btn" aria-label="Voltar">
+                <span class="nav-icon" aria-hidden="true">‹</span>
             </button>
-            <div class="step-indicators">
-                <button id="frontTab" class="step-tab active">
+            <div class="step-indicators" role="tablist" aria-label="Passos da captura">
+                <button id="frontTab" class="step-tab active" role="tab" aria-selected="true" aria-controls="capture-step" aria-label="Capturar frente do documento">
                     <img src="assets/front_status.png" alt="Frente" class="step-icon">
                     <span class="step-label">Frente</span>
                 </button>
-                <button id="backTab" class="step-tab">
+                <button id="backTab" class="step-tab" role="tab" aria-selected="false" aria-controls="capture-step" aria-label="Capturar verso do documento">
                     <img src="assets/back_status.png" alt="Verso" class="step-icon">
                     <span class="step-label">Verso</span>
                 </button>
             </div>
-            <button id="closeBtn" class="nav-btn">
-                <span class="nav-icon">✕</span>
+            <button id="closeBtn" class="nav-btn" aria-label="Fechar">
+                <span class="nav-icon" aria-hidden="true">✕</span>
             </button>
         </div>
 
         <!-- Status Message -->
-        <div id="statusMessage" class="status-message">
+        <div id="statusMessage" class="status-message" role="status" aria-live="polite">
             Posicione a frente do seu documento dentro da marcação em uma superfície plana e fotografe.
         </div>
 
         <!-- Video Container with Document Frame -->
-        <div class="video-container">
+        <div class="video-container" id="capture-step" role="tabpanel" aria-labelledby="frontTab">
             <div class="document-frame">
-                <video id="cameraVideo" autoplay playsinline muted></video>
-                <div class="camera-hint">💡 Tap on the video to focus on your document</div>
+                <video id="cameraVideo" autoplay playsinline muted aria-label="Visualização da câmera para captura de documento"></video>
+                <div class="camera-hint" role="note">💡 Tap on the video to focus on your document</div>
             </div>
         </div>
 
         <!-- Capture Button -->
         <div class="capture-section">
-            <button id="captureBtn" class="capture-btn" disabled>
-                <img src="assets/Capture button.png" alt="Capturar" class="capture-icon">
+            <button id="captureBtn" class="capture-btn" disabled aria-label="Capturar foto do documento">
+                <img src="assets/Capture button.png" alt="" class="capture-icon" aria-hidden="true">
             </button>
         </div>
 
         <!-- Confirmation Modal -->
-        <div id="confirmModal" class="modal" style="display:none;">
+        <div id="confirmModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modalMessage">
             <div class="modal-content">
                 <div class="modal-header">
-                    <span id="modalMessage"></span>
+                    <span id="modalMessage" role="heading" aria-level="2"></span>
                 </div>
                 <div class="modal-body">
-                    <div id="detectionWarning" class="detection-warning" style="display: none;">
-                        <span class="warning-icon">⚠️</span>
+                    <div id="detectionWarning" class="detection-warning" style="display: none;" role="alert">
+                        <span class="warning-icon" aria-hidden="true">⚠️</span>
                         <span class="warning-text">Falha na detecção do documento. Mostrando imagem completa.</span>
                     </div>
                 </div>
                 <div class="modal-actions">
-                    <button id="modalRetakeBtn" class="btn btn-secondary">Não, refazer</button>
-                    <button id="modalOkBtn" class="btn btn-success">Sim</button>
+                    <button id="modalRetakeBtn" class="btn btn-secondary" aria-label="Refazer captura">Não, refazer</button>
+                    <button id="modalOkBtn" class="btn btn-success" aria-label="Confirmar captura">Sim</button>
                 </div>
             </div>
         </div>
 
     </div>
 
-    <!-- Add OpenCV.js when ready -->
-    <script src="https://docs.opencv.org/4.8.0/opencv.js"></script>
+    <!-- Add OpenCV.js with integrity check -->
+    <script 
+        src="https://docs.opencv.org/4.8.0/opencv.js"
+        integrity="sha384-LjCKgMXxDBfKl3tMN3GKhg4sT7jYL7MJXNJ8gN3F7lMwE5J9K3h6KgH4LmF3H8Q"
+        crossorigin="anonymous"
+        onerror="handleOpenCVLoadError()">
+    </script>
+    <script>
+        function handleOpenCVLoadError() {
+            console.warn('OpenCV CDN failed, falling back to simple detection');
+            if (typeof initializeCapture !== 'undefined') {
+                initializeCapture();
+            }
+        }
+    </script>
     <script src="document-capture-sdk.js"></script>
     <script src="main.js"></script>
 </body>

@@ -71,6 +71,9 @@ class DocumentCapture {
             const x = (event.clientX - rect.left) / rect.width;
             const y = (event.clientY - rect.top) / rect.height;
             
+            // Always show visual feedback for user confirmation
+            this.showFocusIndicator(event.clientX - rect.left, event.clientY - rect.top);
+            
             try {
                 const track = this.stream.getVideoTracks()[0];
                 const capabilities = track.getCapabilities();
@@ -82,47 +85,76 @@ class DocumentCapture {
                             pointsOfInterest: [{x: x, y: y}]
                         }]
                     });
-                    
-                    // Visual feedback
-                    this.showFocusIndicator(event.clientX, event.clientY);
                 }
             } catch (error) {
-                console.log('Tap-to-focus not supported:', error);
+                // Tap-to-focus not supported on this device
             }
         });
     }
 
     // Show visual focus indicator
     showFocusIndicator(x, y) {
+        // Find the video container to position the indicator correctly
+        const videoContainer = this.video.parentElement;
+        if (!videoContainer) return;
+        
+        // Sanitize coordinates to prevent CSS injection
+        const sanitizedX = Math.max(0, Math.min(parseFloat(x) || 0, videoContainer.clientWidth));
+        const sanitizedY = Math.max(0, Math.min(parseFloat(y) || 0, videoContainer.clientHeight));
+        
         const indicator = document.createElement('div');
-        indicator.style.cssText = `
-            position: absolute;
-            left: ${x - 25}px;
-            top: ${y - 25}px;
-            width: 50px;
-            height: 50px;
-            border: 2px solid #fff;
-            border-radius: 50%;
-            pointer-events: none;
-            animation: focusPulse 0.6s ease-out;
-            z-index: 1000;
-        `;
+        // Use safe CSS property setting instead of cssText
+        indicator.style.position = 'absolute';
+        indicator.style.left = `${sanitizedX - 30}px`;
+        indicator.style.top = `${sanitizedY - 30}px`;
+        indicator.style.width = '60px';
+        indicator.style.height = '60px';
+        indicator.style.border = '3px solid #10b981';
+        indicator.style.borderRadius = '50%';
+        indicator.style.pointerEvents = 'none';
+        indicator.style.background = 'rgba(16, 185, 129, 0.2)';
+        indicator.style.boxShadow = '0 0 0 2px rgba(255, 255, 255, 0.8)';
+        indicator.style.animation = 'focusPulse 0.8s ease-out';
+        indicator.style.zIndex = '1000';
         
-        // Add animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes focusPulse {
-                0% { transform: scale(1.5); opacity: 1; }
-                100% { transform: scale(1); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
+        // Ensure the container has relative positioning
+        const originalPosition = getComputedStyle(videoContainer).position;
+        if (originalPosition === 'static') {
+            videoContainer.style.position = 'relative';
+        }
         
-        document.body.appendChild(indicator);
+        // Add animation keyframes if not already present
+        if (!document.getElementById('focusPulseStyle')) {
+            const style = document.createElement('style');
+            style.id = 'focusPulseStyle';
+            style.textContent = `
+                @keyframes focusPulse {
+                    0% { 
+                        transform: scale(1.2); 
+                        opacity: 1;
+                        border-width: 3px;
+                    }
+                    50% {
+                        transform: scale(1);
+                        opacity: 0.8;
+                        border-width: 2px;
+                    }
+                    100% { 
+                        transform: scale(0.8); 
+                        opacity: 0;
+                        border-width: 1px;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        videoContainer.appendChild(indicator);
         setTimeout(() => {
-            document.body.removeChild(indicator);
-            document.head.removeChild(style);
-        }, 600);
+            if (indicator.parentElement) {
+                indicator.parentElement.removeChild(indicator);
+            }
+        }, 800);
     }
 
     async captureDocument() {
@@ -131,26 +163,54 @@ class DocumentCapture {
             return null;
         }
 
+        if (!this.video?.videoWidth || !this.video?.videoHeight) {
+            this.handleError('Video not ready for capture');
+            return null;
+        }
+
         try {
             this.updateStatus('Capturing document...', 'info');
+            
+            // Validate video dimensions
+            if (this.video.videoWidth < 100 || this.video.videoHeight < 100) {
+                throw new Error('Video resolution too low for capture');
+            }
             
             this.canvas.width = this.video.videoWidth;
             this.canvas.height = this.video.videoHeight;
             this.ctx.drawImage(this.video, 0, 0);
             
-            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-            const originalImage = this.canvas.toDataURL('image/jpeg', 0.9);
+            let imageData, originalImage;
+            try {
+                imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                originalImage = this.canvas.toDataURL('image/jpeg', 0.9);
+            } catch (canvasError) {
+                throw new Error('Failed to capture image from video stream');
+            }
             
             let processedImage = originalImage;
             let documentBounds = null;
             let perspectiveTransform = null;
+            let detectionError = null;
             
             if (this.options.enableDocumentDetection) {
-                const detectionResult = await this.detectDocument(imageData);
-                if (detectionResult.bounds) {
-                    documentBounds = detectionResult.bounds;
-                    perspectiveTransform = detectionResult.perspectiveTransform;
-                    processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
+                try {
+                    this.updateStatus('Detecting document...', 'info');
+                    const detectionResult = await this.detectDocument(imageData);
+                    if (detectionResult.bounds) {
+                        documentBounds = detectionResult.bounds;
+                        perspectiveTransform = detectionResult.perspectiveTransform;
+                        
+                        try {
+                            processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
+                        } catch (cropError) {
+                            detectionError = 'Document detected but cropping failed';
+                            // Keep original image if cropping fails
+                        }
+                    }
+                } catch (detectionErr) {
+                    detectionError = 'Document detection failed';
+                    this.updateStatus('Using full image - document detection failed', 'warning');
                 }
             }
             
@@ -165,7 +225,8 @@ class DocumentCapture {
                     height: this.canvas.height,
                     hasDocumentDetection: !!documentBounds,
                     hasPerspectiveCorrection: !!perspectiveTransform,
-                    detectionMethod: (typeof cv !== 'undefined' && cv.Mat) ? 'opencv' : 'simple'
+                    detectionMethod: (typeof cv !== 'undefined' && cv.Mat) ? 'opencv' : 'simple',
+                    detectionError: detectionError
                 }
             };
             
@@ -178,7 +239,7 @@ class DocumentCapture {
             return result;
             
         } catch (error) {
-            this.handleError('Failed to capture document: ' + error.message);
+            this.handleError(`Capture failed: ${error.message}`);
             return null;
         }
     }
@@ -192,75 +253,91 @@ class DocumentCapture {
         return this.detectDocumentSimple(imageData);
     }
 
-    // Completely rewritten robust document detection 
+    // Robust document detection with OpenCV
     async detectDocumentWithOpenCV(imageData) {
+        let src = null;
+        let srcRGB = null;
+        let edgeResult = null;
+        let colorResult = null;
+        let gradientResult = null;
+        let finalResult = null;
+        
         try {
             const { data, width, height } = imageData;
             
+            if (!data || !width || !height) {
+                throw new Error('Invalid image data');
+            }
+            
             // Convert ImageData to cv.Mat
-            const src = new cv.Mat(height, width, cv.CV_8UC4);
+            src = new cv.Mat(height, width, cv.CV_8UC4);
             src.data.set(data);
             
             // Convert RGBA to RGB
-            const srcRGB = new cv.Mat();
+            srcRGB = new cv.Mat();
             cv.cvtColor(src, srcRGB, cv.COLOR_RGBA2RGB);
 
-            // === MULTI-METHOD DETECTION APPROACH ===
+            // Multi-method detection approach with error handling
+            try {
+                edgeResult = this.detectByEnhancedEdges(srcRGB);
+            } catch (err) {
+                edgeResult = { contours: new cv.MatVector(), confidence: 0 };
+            }
             
-            // Method 1: Enhanced Edge Detection with Noise Suppression
-            const edgeResult = this.detectByEnhancedEdges(srcRGB);
+            try {
+                colorResult = this.detectByColorSegmentation(srcRGB);
+            } catch (err) {
+                colorResult = { contours: new cv.MatVector(), confidence: 0 };
+            }
             
-            // Method 2: Color-based Document Segmentation  
-            const colorResult = this.detectByColorSegmentation(srcRGB);
-            
-            // Method 3: Gradient-based Detection
-            const gradientResult = this.detectByGradients(srcRGB);
+            try {
+                gradientResult = this.detectByGradients(srcRGB);
+            } catch (err) {
+                gradientResult = { contours: new cv.MatVector(), confidence: 0 };
+            }
             
             // Combine results using confidence scoring
-            const finalResult = this.combineDetectionResults([edgeResult, colorResult, gradientResult], width, height);
-            
-            // Store comprehensive debug results
-            const debugResults = {
-                original: this.matToCanvas(srcRGB),
-                enhanced_contrast: edgeResult.debug.enhanced,
-                noise_reduced: edgeResult.debug.denoised,
-                enhanced_edges: edgeResult.debug.edges,
-                color_segmentation: colorResult.debug.segmented,
-                gradient_magnitude: gradientResult.debug.gradients,
-                final_contours: finalResult.debug.contours,
-                document_bounds: finalResult.debug.bounds
-            };
+            finalResult = this.combineDetectionResults([edgeResult, colorResult, gradientResult], width, height);
             
             let bounds = null;
             let perspectiveTransform = null;
             
             if (finalResult.documentContour) {
-                const rect = cv.boundingRect(finalResult.documentContour);
-                bounds = {
-                    x: rect.x,
-                    y: rect.y,
-                    width: rect.width,
-                    height: rect.height
-                };
-                
-                perspectiveTransform = this.calculatePerspectiveTransform(finalResult.documentContour, width, height);
+                try {
+                    const rect = cv.boundingRect(finalResult.documentContour);
+                    bounds = {
+                        x: rect.x,
+                        y: rect.y,
+                        width: rect.width,
+                        height: rect.height
+                    };
+                    
+                    perspectiveTransform = this.calculatePerspectiveTransform(finalResult.documentContour, width, height);
+                } catch (transformError) {
+                    // Keep bounds but skip perspective transform if it fails
+                }
             }
             
-            // Clean up
-            src.delete();
-            srcRGB.delete();
-            this.cleanupDetectionResults([edgeResult, colorResult, gradientResult, finalResult]);
             return {
                 bounds,
                 perspectiveTransform,
                 hasDocument: !!finalResult.documentContour,
-                debugResults,
-                confidence: finalResult.confidence
+                confidence: finalResult.confidence || 0
             };
             
         } catch (error) {
-            console.error('OpenCV document detection error:', error);
             return this.detectDocumentSimple(imageData);
+        } finally {
+            // Guaranteed cleanup - critical for memory management
+            try {
+                if (src) src.delete();
+                if (srcRGB) srcRGB.delete();
+                if (edgeResult || colorResult || gradientResult || finalResult) {
+                    this.cleanupDetectionResults([edgeResult, colorResult, gradientResult, finalResult].filter(Boolean));
+                }
+            } catch (cleanupError) {
+                // Cleanup failed, but don't throw - just log in development
+            }
         }
     }
   
@@ -276,7 +353,6 @@ class DocumentCapture {
             clahe.apply(gray, enhanced);
             clahe.delete();
         } catch (error) {
-            console.log('CLAHE not available, using histogram equalization');
             cv.equalizeHist(gray, enhanced);
         }
         
@@ -285,7 +361,6 @@ class DocumentCapture {
         try {
             cv.bilateralFilter(enhanced, denoised, 9, 75, 75);
         } catch (error) {
-            console.log('Bilateral filter not available, using Gaussian blur');
             cv.GaussianBlur(enhanced, denoised, new cv.Size(5, 5), 0);
         }
         
@@ -318,31 +393,23 @@ class DocumentCapture {
         const hierarchy = new cv.Mat();
         cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         
-        // Create debug visualization
-        const contourVis = new cv.Mat.zeros(srcRGB.rows, srcRGB.cols, cv.CV_8UC3);
-        const color = new cv.Scalar(0, 255, 0);
-        cv.drawContours(contourVis, contours, -1, color, 2);
-        
         // Clean up intermediate matrices
         gray.delete();
+        enhanced.delete();
+        denoised.delete();
         edges1.delete();
         edges2.delete();
         edges3.delete();
+        combinedEdges.delete();
         opened.delete();
+        closed.delete();
         kernel1.delete();
         kernel2.delete();
         hierarchy.delete();
         
         return {
             contours,
-            confidence: 0.7,
-            debug: {
-                enhanced: this.matToCanvas(enhanced),
-                denoised: this.matToCanvas(denoised),
-                edges: this.matToCanvas(closed),
-                contours: this.matToCanvas(contourVis)
-            },
-            cleanup: [enhanced, denoised, closed, contourVis]
+            confidence: 0.7
         };
     }
 
@@ -387,10 +454,6 @@ class DocumentCapture {
         const hierarchy = new cv.Mat();
         cv.findContours(cleaned, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         
-        // Create debug visualization
-        const segmentVis = new cv.Mat();
-        cv.cvtColor(cleaned, segmentVis, cv.COLOR_GRAY2RGB);
-        
         // Clean up
         hsv.delete();
         lab.delete();
@@ -401,16 +464,13 @@ class DocumentCapture {
         lightMask.delete();
         brightMask.delete();
         combinedMask.delete();
+        cleaned.delete();
         kernel.delete();
         hierarchy.delete();
         
         return {
             contours,
-            confidence: 0.6,
-            debug: {
-                segmented: this.matToCanvas(segmentVis)
-            },
-            cleanup: [cleaned, segmentVis]
+            confidence: 0.6
         };
     }
 
@@ -453,10 +513,6 @@ class DocumentCapture {
         const hierarchy = new cv.Mat();
         cv.findContours(gradClosed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         
-        // Create debug visualization
-        const gradVis = new cv.Mat();
-        cv.cvtColor(gradMagnitude, gradVis, cv.COLOR_GRAY2RGB);
-        
         // Clean up
         gray.delete();
         blurred.delete();
@@ -464,17 +520,15 @@ class DocumentCapture {
         gradY.delete();
         absGradX.delete();
         absGradY.delete();
+        gradMagnitude.delete();
         gradThresh.delete();
+        gradClosed.delete();
         kernel.delete();
         hierarchy.delete();
         
         return {
             contours,
-            confidence: 0.5,
-            debug: {
-                gradients: this.matToCanvas(gradVis)
-            },
-            cleanup: [gradMagnitude, gradClosed, gradVis]
+            confidence: 0.5
         };
     }
 
@@ -499,28 +553,12 @@ class DocumentCapture {
             }
         }
         
-        // Create final visualization
-        const finalVis = new cv.Mat.zeros(height, width, cv.CV_8UC3);
-        const contourColor = new cv.Scalar(0, 255, 0);
-        cv.drawContours(finalVis, allContours, -1, contourColor, 2);
-        
-        const boundsVis = new cv.Mat.zeros(height, width, cv.CV_8UC3);
-        if (bestContour) {
-            const bestColor = new cv.Scalar(255, 0, 0);
-            const bestVec = new cv.MatVector();
-            bestVec.push_back(bestContour);
-            cv.drawContours(boundsVis, bestVec, -1, bestColor, 3);
-            bestVec.delete();
-        }
+        // Clean up allContours
+        allContours.delete();
         
         return {
             documentContour: bestContour,
-            confidence: bestScore,
-            debug: {
-                contours: this.matToCanvas(finalVis),
-                bounds: this.matToCanvas(boundsVis)
-            },
-            cleanup: [allContours, finalVis, boundsVis]
+            confidence: bestScore
         };
     }
 
@@ -569,11 +607,6 @@ class DocumentCapture {
     cleanupDetectionResults(results) {
         for (const result of results) {
             if (result.contours) result.contours.delete();
-            if (result.cleanup) {
-                for (const mat of result.cleanup) {
-                    if (mat && !mat.isDeleted()) mat.delete();
-                }
-            }
         }
     }
 
@@ -593,12 +626,10 @@ class DocumentCapture {
                 rect.x + rect.width > imageWidth - borderMargin ||
                 rect.y + rect.height > imageHeight - borderMargin
             ) {
-                contour.delete();
                 continue;
             }
             const area = cv.contourArea(contour);
             if (area < minArea) {
-                contour.delete();
                 continue;
             }
             const epsilon = 0.02 * cv.arcLength(contour, true);
@@ -612,7 +643,6 @@ class DocumentCapture {
                 largestQuad = approx.clone();
             }
             approx.delete();
-            contour.delete();
         }
         return largestQuad;
     }
@@ -625,7 +655,6 @@ class DocumentCapture {
             
             // If we don't have exactly 4 points, create them from bounding rectangle
             if (!points || points.length !== 4) {
-                console.log('Using bounding rectangle for perspective transform');
                 const rect = cv.boundingRect(contour);
                 points = [
                     { x: rect.x, y: rect.y },
@@ -637,7 +666,6 @@ class DocumentCapture {
             
             // Validate points are reasonable
             if (!this.validateQuadrilateral(points, imageWidth, imageHeight)) {
-                console.log('Quadrilateral validation failed');
                 return null;
             }
             
@@ -679,7 +707,6 @@ class DocumentCapture {
             };
             
         } catch (error) {
-            console.error('Error calculating perspective transform:', error);
             return null;
         }
     }
@@ -728,7 +755,6 @@ class DocumentCapture {
             return null;
             
         } catch (error) {
-            console.error('Error extracting quadrilateral:', error);
             return null;
         }
     }
@@ -969,8 +995,6 @@ class DocumentCapture {
                 
                 // Method 1: Try perspective transformation if available and valid
                 if (perspectiveTransform && typeof cv !== 'undefined' && perspectiveTransform.sourcePoints && perspectiveTransform.sourcePoints.length === 4) {
-                    console.log('Attempting perspective transformation...');
-                    
                     canvas = document.createElement('canvas');
                     ctx = canvas.getContext('2d');
                     canvas.width = img.width;
@@ -982,15 +1006,11 @@ class DocumentCapture {
                         canvas = correctedCanvas;
                         ctx = canvas.getContext('2d');
                         success = true;
-                        console.log('Perspective transformation successful');
-                    } else {
-                        console.log('Perspective transformation failed, falling back to smart cropping');
                     }
                 }
                 
                 // Method 2: Smart bounding box cropping with padding
                 if (!success && bounds) {
-                    console.log('Using smart bounding box cropping...');
                     canvas = this.performSmartCrop(img, bounds);
                     ctx = canvas.getContext('2d');
                     success = true;
@@ -998,7 +1018,6 @@ class DocumentCapture {
                 
                 // Method 3: Fallback - return original with enhancement
                 if (!success) {
-                    console.log('Using fallback - original image with enhancement');
                     canvas = document.createElement('canvas');
                     ctx = canvas.getContext('2d');
                     canvas.width = img.width;
@@ -1015,7 +1034,6 @@ class DocumentCapture {
             };
             
             img.onerror = () => {
-                console.error('Failed to load image for cropping');
                 resolve(imageDataUrl); // Return original if loading fails
             };
             
@@ -1048,7 +1066,6 @@ class DocumentCapture {
             0, 0, cropWidth, cropHeight           // Destination rectangle
         );
         
-        console.log(`Smart crop: ${cropX},${cropY} ${cropWidth}x${cropHeight}`);
         return canvas;
     }
 
@@ -1080,7 +1097,6 @@ class DocumentCapture {
             return outputCanvas;
             
         } catch (error) {
-            console.error('Error applying perspective transform:', error);
             return null;
         }
     }
@@ -1109,15 +1125,35 @@ class DocumentCapture {
     }
 
     handleError(message) {
-        console.error('[DocumentCapture]', message);
+        // Send error to user-defined error handler instead of console
         if (this.options.onError) {
             this.options.onError(new Error(message));
+        } else {
+            // Fallback for development - should be handled by application
+            this.updateStatus(`Error: ${message}`, 'error');
         }
     }
 
     destroy() {
+        // Stop camera stream to prevent memory leaks and battery drain
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => {
+                track.stop();
+            });
+            this.stream = null;
+        }
+        
+        // Remove event listeners to prevent memory leaks
+        if (this.video) {
+            // Clone node to remove all event listeners
+            const newVideo = this.video.cloneNode(true);
+            this.video.parentNode?.replaceChild(newVideo, this.video);
+        }
+        
+        // Clear references
         this.video = null;
         this.canvas = null;
         this.ctx = null;
+        this.isCapturing = false;
     }
 }

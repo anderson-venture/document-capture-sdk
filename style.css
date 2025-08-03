@@ -64,7 +64,7 @@ body {
     opacity: 1;
 }
 
-.controls {
+.step-indicators {
     display: flex;
     gap: 32px;
     position: absolute;
