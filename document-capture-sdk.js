@@ -71,9 +71,6 @@ class DocumentCapture {
             const x = (event.clientX - rect.left) / rect.width;
             const y = (event.clientY - rect.top) / rect.height;
             
-            // Always show visual feedback for user confirmation
-            this.showFocusIndicator(event.clientX - rect.left, event.clientY - rect.top);
-            
             try {
                 const track = this.stream.getVideoTracks()[0];
                 const capabilities = track.getCapabilities();
@@ -85,76 +82,47 @@ class DocumentCapture {
                             pointsOfInterest: [{x: x, y: y}]
                         }]
                     });
+                    
+                    // Visual feedback
+                    this.showFocusIndicator(event.clientX, event.clientY);
                 }
-            } catch (error) {
-                // Tap-to-focus not supported on this device
-            }
+                            } catch (error) {
+                    // Tap-to-focus not supported on this device
+                }
         });
     }
 
     // Show visual focus indicator
     showFocusIndicator(x, y) {
-        // Find the video container to position the indicator correctly
-        const videoContainer = this.video.parentElement;
-        if (!videoContainer) return;
-        
-        // Sanitize coordinates to prevent CSS injection
-        const sanitizedX = Math.max(0, Math.min(parseFloat(x) || 0, videoContainer.clientWidth));
-        const sanitizedY = Math.max(0, Math.min(parseFloat(y) || 0, videoContainer.clientHeight));
-        
         const indicator = document.createElement('div');
-        // Use safe CSS property setting instead of cssText
-        indicator.style.position = 'absolute';
-        indicator.style.left = `${sanitizedX - 30}px`;
-        indicator.style.top = `${sanitizedY - 30}px`;
-        indicator.style.width = '60px';
-        indicator.style.height = '60px';
-        indicator.style.border = '3px solid #10b981';
-        indicator.style.borderRadius = '50%';
-        indicator.style.pointerEvents = 'none';
-        indicator.style.background = 'rgba(16, 185, 129, 0.2)';
-        indicator.style.boxShadow = '0 0 0 2px rgba(255, 255, 255, 0.8)';
-        indicator.style.animation = 'focusPulse 0.8s ease-out';
-        indicator.style.zIndex = '1000';
+        indicator.style.cssText = `
+            position: absolute;
+            left: ${x - 25}px;
+            top: ${y - 25}px;
+            width: 50px;
+            height: 50px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: focusPulse 0.6s ease-out;
+            z-index: 1000;
+        `;
         
-        // Ensure the container has relative positioning
-        const originalPosition = getComputedStyle(videoContainer).position;
-        if (originalPosition === 'static') {
-            videoContainer.style.position = 'relative';
-        }
-        
-        // Add animation keyframes if not already present
-        if (!document.getElementById('focusPulseStyle')) {
-            const style = document.createElement('style');
-            style.id = 'focusPulseStyle';
-            style.textContent = `
-                @keyframes focusPulse {
-                    0% { 
-                        transform: scale(1.2); 
-                        opacity: 1;
-                        border-width: 3px;
-                    }
-                    50% {
-                        transform: scale(1);
-                        opacity: 0.8;
-                        border-width: 2px;
-                    }
-                    100% { 
-                        transform: scale(0.8); 
-                        opacity: 0;
-                        border-width: 1px;
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        videoContainer.appendChild(indicator);
-        setTimeout(() => {
-            if (indicator.parentElement) {
-                indicator.parentElement.removeChild(indicator);
+        // Add animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes focusPulse {
+                0% { transform: scale(1.5); opacity: 1; }
+                100% { transform: scale(1); opacity: 0; }
             }
-        }, 800);
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(indicator);
+        setTimeout(() => {
+            document.body.removeChild(indicator);
+            document.head.removeChild(style);
+        }, 600);
     }
 
     async captureDocument() {
@@ -163,54 +131,26 @@ class DocumentCapture {
             return null;
         }
 
-        if (!this.video?.videoWidth || !this.video?.videoHeight) {
-            this.handleError('Video not ready for capture');
-            return null;
-        }
-
         try {
             this.updateStatus('Capturing document...', 'info');
-            
-            // Validate video dimensions
-            if (this.video.videoWidth < 100 || this.video.videoHeight < 100) {
-                throw new Error('Video resolution too low for capture');
-            }
             
             this.canvas.width = this.video.videoWidth;
             this.canvas.height = this.video.videoHeight;
             this.ctx.drawImage(this.video, 0, 0);
             
-            let imageData, originalImage;
-            try {
-                imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                originalImage = this.canvas.toDataURL('image/jpeg', 0.9);
-            } catch (canvasError) {
-                throw new Error('Failed to capture image from video stream');
-            }
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const originalImage = this.canvas.toDataURL('image/jpeg', 0.9);
             
             let processedImage = originalImage;
             let documentBounds = null;
             let perspectiveTransform = null;
-            let detectionError = null;
             
             if (this.options.enableDocumentDetection) {
-                try {
-                    this.updateStatus('Detecting document...', 'info');
-                    const detectionResult = await this.detectDocument(imageData);
-                    if (detectionResult.bounds) {
-                        documentBounds = detectionResult.bounds;
-                        perspectiveTransform = detectionResult.perspectiveTransform;
-                        
-                        try {
-                            processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
-                        } catch (cropError) {
-                            detectionError = 'Document detected but cropping failed';
-                            // Keep original image if cropping fails
-                        }
-                    }
-                } catch (detectionErr) {
-                    detectionError = 'Document detection failed';
-                    this.updateStatus('Using full image - document detection failed', 'warning');
+                const detectionResult = await this.detectDocument(imageData);
+                if (detectionResult.bounds) {
+                    documentBounds = detectionResult.bounds;
+                    perspectiveTransform = detectionResult.perspectiveTransform;
+                    processedImage = await this.cropAndEnhance(originalImage, documentBounds, perspectiveTransform);
                 }
             }
             
@@ -225,8 +165,7 @@ class DocumentCapture {
                     height: this.canvas.height,
                     hasDocumentDetection: !!documentBounds,
                     hasPerspectiveCorrection: !!perspectiveTransform,
-                    detectionMethod: (typeof cv !== 'undefined' && cv.Mat) ? 'opencv' : 'simple',
-                    detectionError: detectionError
+                    detectionMethod: (typeof cv !== 'undefined' && cv.Mat) ? 'opencv' : 'simple'
                 }
             };
             
@@ -239,7 +178,7 @@ class DocumentCapture {
             return result;
             
         } catch (error) {
-            this.handleError(`Capture failed: ${error.message}`);
+            this.handleError('Failed to capture document: ' + error.message);
             return null;
         }
     }
@@ -255,89 +194,54 @@ class DocumentCapture {
 
     // Robust document detection with OpenCV
     async detectDocumentWithOpenCV(imageData) {
-        let src = null;
-        let srcRGB = null;
-        let edgeResult = null;
-        let colorResult = null;
-        let gradientResult = null;
-        let finalResult = null;
-        
         try {
             const { data, width, height } = imageData;
             
-            if (!data || !width || !height) {
-                throw new Error('Invalid image data');
-            }
-            
             // Convert ImageData to cv.Mat
-            src = new cv.Mat(height, width, cv.CV_8UC4);
+            const src = new cv.Mat(height, width, cv.CV_8UC4);
             src.data.set(data);
             
             // Convert RGBA to RGB
-            srcRGB = new cv.Mat();
+            const srcRGB = new cv.Mat();
             cv.cvtColor(src, srcRGB, cv.COLOR_RGBA2RGB);
 
-            // Multi-method detection approach with error handling
-            try {
-                edgeResult = this.detectByEnhancedEdges(srcRGB);
-            } catch (err) {
-                edgeResult = { contours: new cv.MatVector(), confidence: 0 };
-            }
-            
-            try {
-                colorResult = this.detectByColorSegmentation(srcRGB);
-            } catch (err) {
-                colorResult = { contours: new cv.MatVector(), confidence: 0 };
-            }
-            
-            try {
-                gradientResult = this.detectByGradients(srcRGB);
-            } catch (err) {
-                gradientResult = { contours: new cv.MatVector(), confidence: 0 };
-            }
+            // Multi-method detection approach
+            const edgeResult = this.detectByEnhancedEdges(srcRGB);
+            const colorResult = this.detectByColorSegmentation(srcRGB);
+            const gradientResult = this.detectByGradients(srcRGB);
             
             // Combine results using confidence scoring
-            finalResult = this.combineDetectionResults([edgeResult, colorResult, gradientResult], width, height);
+            const finalResult = this.combineDetectionResults([edgeResult, colorResult, gradientResult], width, height);
             
             let bounds = null;
             let perspectiveTransform = null;
             
             if (finalResult.documentContour) {
-                try {
-                    const rect = cv.boundingRect(finalResult.documentContour);
-                    bounds = {
-                        x: rect.x,
-                        y: rect.y,
-                        width: rect.width,
-                        height: rect.height
-                    };
-                    
-                    perspectiveTransform = this.calculatePerspectiveTransform(finalResult.documentContour, width, height);
-                } catch (transformError) {
-                    // Keep bounds but skip perspective transform if it fails
-                }
+                const rect = cv.boundingRect(finalResult.documentContour);
+                bounds = {
+                    x: rect.x,
+                    y: rect.y,
+                    width: rect.width,
+                    height: rect.height
+                };
+                
+                perspectiveTransform = this.calculatePerspectiveTransform(finalResult.documentContour, width, height);
             }
+            
+            // Clean up
+            src.delete();
+            srcRGB.delete();
+            this.cleanupDetectionResults([edgeResult, colorResult, gradientResult, finalResult]);
             
             return {
                 bounds,
                 perspectiveTransform,
                 hasDocument: !!finalResult.documentContour,
-                confidence: finalResult.confidence || 0
+                confidence: finalResult.confidence
             };
             
         } catch (error) {
             return this.detectDocumentSimple(imageData);
-        } finally {
-            // Guaranteed cleanup - critical for memory management
-            try {
-                if (src) src.delete();
-                if (srcRGB) srcRGB.delete();
-                if (edgeResult || colorResult || gradientResult || finalResult) {
-                    this.cleanupDetectionResults([edgeResult, colorResult, gradientResult, finalResult].filter(Boolean));
-                }
-            } catch (cleanupError) {
-                // Cleanup failed, but don't throw - just log in development
-            }
         }
     }
   
@@ -1125,35 +1029,15 @@ class DocumentCapture {
     }
 
     handleError(message) {
-        // Send error to user-defined error handler instead of console
+        console.error('[DocumentCapture]', message);
         if (this.options.onError) {
             this.options.onError(new Error(message));
-        } else {
-            // Fallback for development - should be handled by application
-            this.updateStatus(`Error: ${message}`, 'error');
         }
     }
 
     destroy() {
-        // Stop camera stream to prevent memory leaks and battery drain
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => {
-                track.stop();
-            });
-            this.stream = null;
-        }
-        
-        // Remove event listeners to prevent memory leaks
-        if (this.video) {
-            // Clone node to remove all event listeners
-            const newVideo = this.video.cloneNode(true);
-            this.video.parentNode?.replaceChild(newVideo, this.video);
-        }
-        
-        // Clear references
         this.video = null;
         this.canvas = null;
         this.ctx = null;
-        this.isCapturing = false;
     }
 }
