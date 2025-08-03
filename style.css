@@ -48,22 +48,6 @@ body {
     line-height: 1;
 }
 
-.camera-hint {
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    text-align: center;
-    margin-top: 10px;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-}
-
-.camera-hint:hover {
-    opacity: 1;
-}
-
 .step-indicators {
     display: flex;
     gap: 32px;
